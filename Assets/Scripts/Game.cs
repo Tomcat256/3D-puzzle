@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class Game : MonoBehaviour {
 
@@ -31,11 +32,39 @@ public class Game : MonoBehaviour {
 	
 	}
 
+	private class Pair<T1,T2>{
+		public T1 first;
+		public T2 second;
+
+		public Pair(T1 pFirst, T2 pSecond){
+			first = pFirst;
+			second = pSecond;
+		}
+	}
+
+	private List<Pair<int,int>> PrepareInitialPositions(int layoutRadius){
+		List<Pair<int,int>> positions = new List<Pair<int, int>>();
+
+		for (int row = -layoutRadius; row <= layoutRadius; row++)
+			for (int column = -layoutRadius; column <= layoutRadius; column++) {
+				positions.Add (new Pair<int,int> (row, column));
+			}
+
+		foreach (Pair<int,int> it in positions)
+			print (string.Format("{0}, {1}", it.first, it.second));
+
+		return positions;
+	}
 
 	public void ApplyInitialLayout(){
+		List<Pair<int,int>> possiblePositions = PrepareInitialPositions (7);
+
 		for (uint row = 0; row < RowsCount; row++)
 			for (uint column = 0; column < ColumnsCount; column++) {
-				_parts [row, column].transform.localPosition = new Vector3(Random.Range(-5,5), _centers [row, column].y, Random.Range(-5,5));
+				int positionIndex = Random.Range (0, possiblePositions.Count - 1);
+				Pair<int,int> position = possiblePositions [positionIndex];
+				possiblePositions.RemoveAt (positionIndex);
+				_parts [row, column].transform.localPosition = new Vector3(position.first, _centers [row, column].y + Random.value * 3, position.second);
 				_parts [row, column].transform.Rotate (new Vector3 (0, 0, Random.Range (0, 4) * 90));
 			}
 	}
