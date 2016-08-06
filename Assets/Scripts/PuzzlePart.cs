@@ -17,9 +17,15 @@ public class PuzzlePart : MonoBehaviour {
 		renderer.material.mainTextureScale = tiling;
 		renderer.material.mainTextureOffset = offset;
 	}
-	
-	// Update is called once per frame
-	void Update () {
+
+    public void SetTexture(Texture texture)
+    {
+        MeshRenderer renderer = gameObject.GetComponent<MeshRenderer>();
+        renderer.material.mainTexture = texture;
+    }
+
+    // Update is called once per frame
+    void Update () {
 	
 	}
 }
