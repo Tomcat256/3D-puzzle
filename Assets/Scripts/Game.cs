@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class Game : MonoBehaviour {
 
@@ -13,6 +14,7 @@ public class Game : MonoBehaviour {
 
 	private GameObject[,] _parts;
 	private GameObject[,] _placeholders;
+	private float _centersHeight = 0.6F;
 	private Vector3[,] _centers;
 
 	private GameObject _draggingObject;
@@ -31,11 +33,36 @@ public class Game : MonoBehaviour {
 	
 	}
 
+	private List<Vector3> PrepareInitialPositions(){
+		uint partsNumber = RowsCount * ColumnsCount;
+		uint initialColumnsCount = ColumnsCount * 5;
+		uint initialRowsCount = RowsCount / 2;
+
+		Vector2 topLeft = new Vector2(((int)ColumnsCount - initialColumnsCount) / 2,  RowsCount + 2);
+		Vector2 bottomRight = new Vector2 ((ColumnsCount + initialColumnsCount) / 2, RowsCount + initialRowsCount + 2);
+
+		print (topLeft);
+		print (bottomRight);
+
+		List<Vector3> positions = new List<Vector3>();
+
+		for (float z = topLeft.y; z <= bottomRight.y; z++)
+			for (float x = topLeft.x; x <= bottomRight.x; x++) {
+				positions.Add (new Vector3(x, _centersHeight + Random.value * 3, z));
+			}
+
+		return positions;
+	}
 
 	public void ApplyInitialLayout(){
+		List<Vector3> possiblePositions = PrepareInitialPositions ();
+
 		for (uint row = 0; row < RowsCount; row++)
 			for (uint column = 0; column < ColumnsCount; column++) {
-				_parts [row, column].transform.localPosition = new Vector3(Random.Range(-5,5), _centers [row, column].y, Random.Range(-5,5));
+				int positionIndex = Random.Range (0, possiblePositions.Count - 1);
+				Vector3 position = possiblePositions [positionIndex];
+				possiblePositions.RemoveAt (positionIndex);
+				_parts [row, column].transform.localPosition = position;
 				_parts [row, column].transform.Rotate (new Vector3 (0, 0, Random.Range (0, 4) * 90));
 			}
 	}
@@ -52,7 +79,7 @@ public class Game : MonoBehaviour {
 
 		for (uint row = 0; row < RowsCount; row++)
 			for (uint column = 0; column < ColumnsCount; column++) {
-				_centers [row, column] = new Vector3 (1.03F * column, 0.6F, 1.03F * row);
+				_centers [row, column] = new Vector3 (1.03F * column, _centersHeight, 1.03F * row);
 			}		
 	}
 
