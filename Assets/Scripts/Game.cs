@@ -5,6 +5,7 @@ public class Game : MonoBehaviour {
 
 	public uint RowsCount;
 	public uint ColumnsCount;
+    public string TextureName = null;
 
 	public GameObject PuzzlePartPrefab;
 	public GameObject Desktop;
@@ -24,7 +25,8 @@ public class Game : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		_draggingObject = null;
-		CreateCenters ();
+        LoadContext();
+        CreateCenters ();
         InitTextures();
 		CreateParts ();
 		SetupPlaceholders ();
@@ -94,10 +96,17 @@ public class Game : MonoBehaviour {
         doDrag();
     }
 
+    private void LoadContext()
+    {
+        RowsCount = GlobalContext.Instance.RowsCount;
+        ColumnsCount = GlobalContext.Instance.ColumnsCount;
+        TextureName = GlobalContext.Instance.TextureName;
+    }
+
     private void InitTextures()
     {
         _textureManager = new TextureManager();
-        _currentTexture = _textureManager.GetRandomTexture();
+        _currentTexture = _textureManager.GetTexture(TextureName);
     }
 
     private List<Vector3> PrepareInitialPositions()

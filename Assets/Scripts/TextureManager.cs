@@ -7,6 +7,8 @@ public class TextureManager
     private string _textureDir = "data";
     private List<string> _textureNames;
 
+    public const string RANDOM_TEXTURE_NAME = "RandomTexture";
+
     public List<string> TextureNames
     {
         get
@@ -20,29 +22,42 @@ public class TextureManager
         CollectTextureNames();
     }
 
-    public Texture GetTextureByName(string name)
-    {
-        string filename = name;
-        return ReadFromFile(filename);
-    }
-
     public Texture GetRandomTexture()
     {
         string texName = _textureNames[Random.Range(0, _textureNames.Count)];
-        return GetTextureByName(texName);
+        return GetTexture(texName);
     }
 
-    private Texture ReadFromFile(string filename)
+    public Texture GetTexture(string textureName)
     {
+        if(textureName == RANDOM_TEXTURE_NAME)
+        {
+            return GetRandomTexture();
+        }
+
         Texture2D texture = new Texture2D(1, 1);
+
+        byte[] rawImage = LoadRawTextureImage(textureName);
+
+        texture.LoadImage(rawImage);
+
+        return texture;
+    }
+
+    public byte[] LoadRawTextureImage(string textureName)
+    {
+        string filename = TextureNameToFilename(textureName);
 
         FileInfo texFileInfo = new FileInfo(filename);
 
         byte[] rawImage = File.ReadAllBytes(texFileInfo.FullName);
 
-        texture.LoadImage(rawImage);
+        return rawImage;
+    }
 
-        return texture;
+    private string TextureNameToFilename(string textureName)
+    {
+        return textureName;
     }
 
     private void CollectTextureNames()
