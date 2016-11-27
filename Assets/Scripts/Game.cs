@@ -5,6 +5,7 @@ public class Game : MonoBehaviour {
 
 	public uint RowsCount;
 	public uint ColumnsCount;
+    public string TextureName = null;
 
 	public GameObject PuzzlePartPrefab;
 	public GameObject Desktop;
@@ -12,11 +13,11 @@ public class Game : MonoBehaviour {
 	public Camera MainCamera;
 
 	private GameObject[,] _parts;
+    private List<GameObject> _groups;
 	private GameObject[,] _placeholders;
-	private float _centersHeight = 0.6F;
-    private float _gapBetweenParts = 0.03F;
-	private Vector3[,] _centers;
+
     private TextureManager _textureManager;
+    private LocationManager _locationManager;
     private Texture _currentTexture;
 
 	private GameObject _draggingObject;
@@ -24,7 +25,8 @@ public class Game : MonoBehaviour {
 	// Use this for initialization
 	void Start () {
 		_draggingObject = null;
-		CreateCenters ();
+        _locationManager = new LocationManager(RowsCount, ColumnsCount);
+        LoadContext();
         InitTextures();
 		CreateParts ();
 		SetupPlaceholders ();
@@ -37,44 +39,47 @@ public class Game : MonoBehaviour {
 	}
 
     public void ApplyInitialLayout(){
-		List<Vector3> possiblePositions = PrepareInitialPositions ();
+		List<Vector3> possiblePositions = _locationManager.PrepareInitialPositions ();
 
-		for (uint row = 0; row < RowsCount; row++)
-			for (uint column = 0; column < ColumnsCount; column++) {
-				int positionIndex = Random.Range (0, possiblePositions.Count - 1);
-				Vector3 position = possiblePositions [positionIndex];
-				possiblePositions.RemoveAt (positionIndex);
-				_parts [row, column].transform.localPosition = position;
-				_parts [row, column].transform.Rotate (new Vector3 (0, 0, Random.Range (0, 4) * 90));
-			}
-	}
+        foreach(GameObject goGroup in _groups)
+        {
+            int positionIndex = Random.Range(0, possiblePositions.Count - 1);
+            Vector3 position = possiblePositions[positionIndex];
+
+            goGroup.transform.localPosition = position;
+            goGroup.transform.Rotate(LocationManager.RandomRotation());
+
+            possiblePositions.RemoveAt(positionIndex);
+        }
+    }
 
 	public void ApplyFinalLayout(){
 		for (uint row = 0; row < RowsCount; row++)
 			for (uint column = 0; column < ColumnsCount; column++) {
-				_parts [row, column].transform.localPosition = _centers [row, column];
+				_parts [row, column].transform.localPosition = _locationManager.GetLocationFor(row, column);
 			}
 	}
 
     public void OnRotate()
     {
-        GameObject part = GetPuzzlePartUnderCursor();
+        GameObject goGroup = GetPuzzleGroupUnderCursor();
 
-        if (part == null)
+        if (goGroup == null)
             return;
-
-        part.transform.Rotate(new Vector3(0, 0, 90));
+        goGroup.GetComponent<PuzzleGroup>().Unfix();
+        goGroup.transform.Rotate(Vector3.forward * 90);
+        goGroup.GetComponent<PuzzleGroup>().Fix();
     }
 
     public void OnDragBegin()
     {
-        GameObject part = GetPuzzlePartUnderCursor();
+        GameObject group = GetPuzzleGroupUnderCursor();
 
-        if (part == null)
+        if (group == null)
             return;
 
-        _draggingObject = part;
-        _draggingObject.GetComponent<Rigidbody>().mass = 0;
+        group.GetComponent<PuzzleGroup>().Unfix();
+        _draggingObject = group;
     }
 
     public void OnDragEnd()
@@ -82,11 +87,12 @@ public class Game : MonoBehaviour {
         if (!_draggingObject)
             return;
 
-        _draggingObject.GetComponent<Rigidbody>().mass = 100;
-
-        locatePart(_draggingObject);
+        PuzzleGroup group = _draggingObject.GetComponent<PuzzleGroup>();
 
         _draggingObject = null;
+
+        stickPartsToLocation(group);
+        group.GetComponent<PuzzleGroup>().Fix();
     }
 
     public void OnDrag()
@@ -94,52 +100,42 @@ public class Game : MonoBehaviour {
         doDrag();
     }
 
+    private void LoadContext()
+    {
+        RowsCount = GlobalContext.Instance.RowsCount;
+        ColumnsCount = GlobalContext.Instance.ColumnsCount;
+        TextureName = GlobalContext.Instance.TextureName;
+    }
+
     private void InitTextures()
     {
         _textureManager = new TextureManager();
-        _currentTexture = _textureManager.GetRandomTexture();
+        _currentTexture = _textureManager.GetTexture(TextureName);
     }
-
-    private List<Vector3> PrepareInitialPositions()
-    {
-        uint initialColumnsCount = ColumnsCount * 5;
-        uint initialRowsCount = RowsCount / 2;
-
-        Vector2 topLeft = new Vector2(((int)ColumnsCount - initialColumnsCount) / 2, RowsCount + 2);
-        Vector2 bottomRight = new Vector2((ColumnsCount + initialColumnsCount) / 2, RowsCount + initialRowsCount + 2);
-
-        List<Vector3> positions = new List<Vector3>();
-
-        for (float z = topLeft.y; z <= bottomRight.y; z++)
-            for (float x = topLeft.x; x <= bottomRight.x; x++)
-            {
-                positions.Add(new Vector3(x, _centersHeight + Random.value * 3, z));
-            }
-
-        return positions;
-    }
-
-    private void CreateCenters(){
-		_centers = new Vector3[RowsCount, ColumnsCount];
-
-		for (uint row = 0; row < RowsCount; row++)
-			for (uint column = 0; column < ColumnsCount; column++) {
-				_centers [row, column] = new Vector3 (1.03F * column, _centersHeight, (1F + _gapBetweenParts) * row);
-			}		
-	}
 
 	private void CreateParts(){
 		_parts = new GameObject[RowsCount, ColumnsCount];
+        _groups = new List<GameObject>((int)(RowsCount * ColumnsCount));
 
-		for (uint row = 0; row < RowsCount; row++)
+        for (uint row = 0; row < RowsCount; row++)
 			for (uint column = 0; column < ColumnsCount; column++) {
-				GameObject part = (GameObject)Instantiate (PuzzlePartPrefab);
-				part.transform.parent = gameObject.transform;
-				part.GetComponent<PuzzlePart>().Row = row;
+
+                GameObject part = (GameObject)Instantiate (PuzzlePartPrefab);
+
+                GameObject group = new GameObject("Group");
+                group.transform.parent = gameObject.transform;
+                group.AddComponent<PuzzleGroup>();
+                group.GetComponent<PuzzleGroup>().AddPart(part.GetComponent<PuzzlePart>());
+                group.GetComponent<PuzzleGroup>().SetMass(100);
+
+                part.GetComponent<PuzzlePart>().Row = row;
 				part.GetComponent<PuzzlePart>().Column = column;
 				part.GetComponent<PuzzlePart> ().Game = this;
-                part.GetComponent<PuzzlePart>().SetTexture(_currentTexture);
+                part.GetComponent<PuzzlePart>().SetTexture(_currentTexture, 
+                                                            TextureManager.CalculateTextureOffset(row, column, RowsCount, ColumnsCount), 
+                                                            TextureManager.CalculateTextureTiling(RowsCount, ColumnsCount));
                 _parts [row, column] = part;
+                _groups.Add(group);
 			}
 	}
 
@@ -160,40 +156,51 @@ public class Game : MonoBehaviour {
 		return hit.collider.gameObject;
 	}
 
-	private GameObject GetPuzzlePartUnderCursor(){
-		GameObject go = GetObjectUnderCursor ();
-		if (!go) {
+	private GameObject GetPuzzleGroupUnderCursor(){
+		GameObject target = GetObjectUnderCursor ();
+		if (!target)
 			return null;
-		}
 
-		if(go.GetComponent<PuzzlePart> ()){
-			return go;
-		}
+        if (target.GetComponent<PuzzleGroup>())
+        {
+            return target;
+        }
 
-		return null;
+        if (target.GetComponent<PuzzlePart>())
+        {
+            GameObject goGroup = target.transform.parent.gameObject;
+            if (!goGroup.GetComponent<PuzzleGroup>())
+                return null;
+
+            return goGroup;
+        }
+
+        return null;
 	}
 
 	private Vector3 GetLocalMousePosition(){
 		Ray ray = MainCamera.ScreenPointToRay (Input.mousePosition);
-		Plane plane = new Plane (new Vector3 (0, 1, 0), new Vector3 (0, 0, 0));
+		Plane plane = new Plane (Vector3.up, Vector3.zero);
 		float dist;
 		plane.Raycast (ray, out dist);
 		return ray.GetPoint (dist);
 	}
 
-	private void locatePart(GameObject part){
-		Vector2 partPos = new Vector2 (part.transform.position.x, part.transform.position.z);
+	private void stickPartsToLocation(PuzzleGroup group)
+    {
+        foreach (PuzzlePart part in group.Parts)
+        {
+            Vector3? stickLocation = _locationManager.GetStickLocation(part);
 
-		for (uint row = 0; row < RowsCount; row++)
-			for (uint column = 0; column < ColumnsCount; column++) {
-				Vector2 centerPos = new Vector2(_centers [row, column].x, _centers [row, column].z);
-				if (Vector2.Distance (partPos, centerPos) < 0.5F * part.transform.localScale.x) {
-					part.transform.position = _centers [row, column];
-					part.transform.eulerAngles = new Vector3 (0, 0, Mathf.Round (part.transform.eulerAngles.z / 90) * 90);
-					return;
-				}
-					
-			}
+            if (stickLocation == null)
+                continue;
+
+            group.gameObject.transform.position = (Vector3)stickLocation;
+            group.gameObject.transform.eulerAngles = LocationManager.NormalizedRotation(part.gameObject.transform.eulerAngles);
+
+            group.gameObject.GetComponent<Rigidbody>().velocity = Vector3.zero;
+            group.gameObject.GetComponent<Rigidbody>().angularVelocity = Vector3.zero;
+        }
 	}
 
 	private void SetupPlaceholders(){
@@ -204,7 +211,7 @@ public class Game : MonoBehaviour {
 				GameObject placeholder = (GameObject)Instantiate (PlaceholderPrefab);
 				placeholder.transform.parent = gameObject.transform;
 				_placeholders [row, column] = placeholder;
-				_placeholders [row, column].transform.localPosition = _centers [row, column];
+				_placeholders [row, column].transform.localPosition = _locationManager.GetLocationFor(row, column);
 			}
 	}
 
