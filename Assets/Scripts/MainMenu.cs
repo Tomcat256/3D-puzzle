@@ -3,14 +3,41 @@ using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
+internal class SizeUIPreset
+{
+    public uint ColumnsCount;
+    public uint RowssCount;
+
+    public SizeUIPreset(uint rowsCount, uint columnsCount)
+    {
+        RowssCount = rowsCount;
+        ColumnsCount = columnsCount;
+    }
+
+    public string Caption
+    {
+        get
+        {
+            return System.String.Format("{0}x{1}", RowssCount, ColumnsCount);
+        }
+    }
+}
+
+
 public class MainMenu : MonoBehaviour {
 
     public GameObject TogglePrefab;
     public GameObject ParentList;
+    public GameObject SizeDropdown;
 
-	// Use this for initialization
+    public Vector2[] AvailableSizes;
+
+    private List<SizeUIPreset> _dropdownPresets = new List<SizeUIPreset>();
+
+    // Use this for initialization
 	void Start () {
         CreateTextureToggles();
+        SetupSizeDropdown();
     }
 	
 	// Update is called once per frame
@@ -33,6 +60,18 @@ public class MainMenu : MonoBehaviour {
         }
     }
 
+    private void SetupSizeDropdown()
+    {
+        foreach(Vector2 size in AvailableSizes)
+        {
+            SizeUIPreset preset = new SizeUIPreset((uint)size.x, (uint)size.y);
+            SizeDropdown.GetComponent<Dropdown>().options.Add(new Dropdown.OptionData(preset.Caption));
+            _dropdownPresets.Add(preset);
+        }
+
+        SizeDropdown.GetComponent<Dropdown>().value = 0;
+    }
+
     public void onPlayButtonClicked()
     {
         IEnumerator<Toggle> togglesEnumerator = GetComponent<ToggleGroup>().ActiveToggles().GetEnumerator();
@@ -46,8 +85,10 @@ public class MainMenu : MonoBehaviour {
             GlobalContext.Instance.TextureName = TextureManager.RANDOM_TEXTURE_NAME;
         }
 
-        GlobalContext.Instance.ColumnsCount = 5;
-        GlobalContext.Instance.RowsCount = 5;
+        SizeUIPreset selectedSize = _dropdownPresets[SizeDropdown.GetComponent<Dropdown>().value];
+
+        GlobalContext.Instance.ColumnsCount = selectedSize.ColumnsCount;
+        GlobalContext.Instance.RowsCount = selectedSize.RowssCount;
         SceneManager.LoadScene("MainScene");
     }
 }
