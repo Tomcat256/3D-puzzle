@@ -71,4 +71,15 @@ public class TextureManager
             _textureNames.Add(file.FullName);
         }
     }
+
+    public static Vector2 CalculateTextureTiling(float rowsCount, float columnsCount)
+    {
+        return new Vector2(1F / columnsCount, 1F / rowsCount);
+    }
+
+    public static Vector2 CalculateTextureOffset(float row, float column, float rowsCount, float columnsCount)
+    {
+        return new Vector2(column / columnsCount, row / rowsCount);
+    }
+
 }
